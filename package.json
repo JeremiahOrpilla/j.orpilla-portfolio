@@ -1,0 +1,39 @@
+{
+  "name": "jek.dev",
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=20.x"
+  },
+  "description": "Jeremiah Orpilla's personal portfolio",
+  "author": "Jeremiah Orpilla <jeremiahorpilla00@gmail.com>",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.453.0",
+    "next-themes": "^0.4.6",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.3.1",
+    "wouter": "^3.3.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.3",
+    "@types/react": "^19.2.1",
+    "@types/react-dom": "^19.2.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "tailwindcss": "^4.1.14",
+    "typescript": "5.6.3",
+    "vite": "^7.1.7"
+  }
+}
