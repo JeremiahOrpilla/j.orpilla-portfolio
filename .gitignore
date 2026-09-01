@@ -112,3 +112,7 @@ temp/
 
 CLAUDE.md
 .claude/
+
+.playwright-mcp/
+*.png
+!public/*.png

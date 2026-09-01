@@ -78,24 +78,6 @@
   --chart-5: #ec4899;
 }
 
-.dark {
-  --background: var(--slate-900);
-  --foreground: #f8fafc;
-  --card: var(--slate-800);
-  --card-foreground: #f8fafc;
-  --popover: var(--slate-800);
-  --popover-foreground: #f8fafc;
-  --secondary: #334155;
-  --secondary-foreground: #cbd5e1;
-  --muted: #334155;
-  --muted-foreground: #94a3b8;
-  --accent: var(--teal-500);
-  --accent-foreground: #ffffff;
-  --border: #334155;
-  --input: var(--slate-800);
-  --ring: var(--blue-500);
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
