@@ -1,9 +1,3 @@
-export interface SkillItem {
-  name: string;
-  level: number;
-  category: string;
-}
-
 export interface ExperienceItem {
   title: string;
   company: string;
@@ -34,15 +28,6 @@ export interface SocialLinkItem {
   url: string;
   iconName: string;
 }
-
-export const skills: SkillItem[] = [
-  { name: 'Python', level: 85, category: 'Programming' },
-  { name: 'Data Analysis', level: 93, category: 'Analytics' },
-  { name: 'SQL', level: 92, category: 'Databases' },
-  { name: 'Data Visualization', level: 90, category: 'Analytics' },
-  { name: 'Full-Stack Dev', level: 60, category: 'Development' },
-  { name: 'Spreadsheets', level: 95, category: 'Productivity' },
-];
 
 export const experience: ExperienceItem[] = [
   {
