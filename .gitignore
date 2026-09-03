@@ -116,3 +116,5 @@ CLAUDE.md
 .playwright-mcp/
 *.png
 !public/*.png
+
+skills-lock.json

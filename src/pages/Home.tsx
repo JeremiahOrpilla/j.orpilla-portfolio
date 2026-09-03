@@ -73,7 +73,6 @@ export default function Home() {
   const [showCatFact, setShowCatFact] = useState(false);
   const [isCatDancing, setIsCatDancing] = useState(false);
   const [isWalking, setIsWalking] = useState(false);
-  const [walkProgress, setWalkProgress] = useState(0);
   const [storyIndex, setStoryIndex] = useState(-1);
 
   const nextFact = () => {
@@ -91,12 +90,10 @@ export default function Home() {
     setStoryIndex(0);
     setShowCatFact(true);
 
-    // Sequence the walk and story
+    // Step through the story beats in place
     let step = 0;
     const interval = setInterval(() => {
       step += 1;
-      // Adjusted walk progress to stay within safe bounds (10% to 70% of screen width)
-      setWalkProgress(prev => prev + 15);
       setStoryIndex(step);
 
       if (step >= storySteps.length) {
@@ -104,7 +101,6 @@ export default function Home() {
         setTimeout(() => {
           setIsWalking(false);
           setShowCatFact(false);
-          setWalkProgress(0);
           setStoryIndex(-1);
         }, 3000);
       }
@@ -126,6 +122,91 @@ export default function Home() {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  // Hero reveal, cursor-follow avatar parallax, and the cat's proximity
+  // reaction. Kept deliberately restrained: one-shot, IntersectionObserver
+  // driven, direct DOM writes for the continuous pointer values (no
+  // re-render per mousemove), nothing that loops on its own.
+  const heroRef = useRef<HTMLDivElement>(null);
+  const heroVisualRef = useRef<HTMLDivElement>(null);
+  const avatarRef = useRef<HTMLDivElement>(null);
+  const catRef = useRef<HTMLButtonElement>(null);
+  const [heroInView, setHeroInView] = useState(false);
+  const [isCatNear, setIsCatNear] = useState(false);
+  const [prefersReducedMotion] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+
+  useEffect(() => {
+    const el = heroRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setHeroInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.2 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+    const container = heroVisualRef.current;
+    if (!container) return;
+
+    let raf = 0;
+    let catIsNear = false;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const rect = container.getBoundingClientRect();
+        const relX = (e.clientX - rect.left) / rect.width - 0.5;
+        const relY = (e.clientY - rect.top) / rect.height - 0.5;
+
+        if (avatarRef.current) {
+          const maxShift = 10;
+          avatarRef.current.style.transform = `translate3d(${-relX * maxShift}px, ${-relY * maxShift}px, 0)`;
+        }
+
+        if (catRef.current) {
+          const catRect = catRef.current.getBoundingClientRect();
+          const dx = e.clientX - (catRect.left + catRect.width / 2);
+          const dy = e.clientY - (catRect.top + catRect.height / 2);
+          const near = Math.hypot(dx, dy) < 90;
+          if (near !== catIsNear) {
+            catIsNear = near;
+            setIsCatNear(near);
+          }
+        }
+      });
+    };
+
+    const handlePointerLeave = () => {
+      if (avatarRef.current) avatarRef.current.style.transform = 'translate3d(0, 0, 0)';
+      if (catIsNear) {
+        catIsNear = false;
+        setIsCatNear(false);
+      }
+    };
+
+    container.addEventListener('pointermove', handlePointerMove);
+    container.addEventListener('pointerleave', handlePointerLeave);
+    return () => {
+      container.removeEventListener('pointermove', handlePointerMove);
+      container.removeEventListener('pointerleave', handlePointerLeave);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [prefersReducedMotion]);
+
+  const EASE = 'ease-[cubic-bezier(0.16,1,0.3,1)]';
+  const revealCls = `transition-all duration-300 ${EASE} ${heroInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`;
+  const revealDelay = (delayMs: number) => ({ transitionDelay: `${delayMs}ms` });
 
   return (
     <div ref={containerRef} className="min-h-screen transition-colors duration-700 selection:bg-primary/20 bg-background text-foreground">
@@ -184,49 +265,132 @@ export default function Home() {
 
       <main className="pt-16">
         {/* Hero Section */}
-        <section id="home" className="min-h-[90vh] flex items-center justify-center relative overflow-hidden">
-          <div className="absolute inset-0 z-0 opacity-20">
-            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--primary)_0%,_transparent_70%)] blur-[120px]" />
-          </div>
-          <div className="container relative z-10 text-center space-y-8 animate-fade-in">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider">
-              <Zap className="w-3 h-3" />
-              Let's Make Sense of the Numbers
-            </div>
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
-              Hi, I'm <span className="text-primary">Jeremiah</span>. <br />
-              I build data-driven solutions.
-            </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Data Analyst & Programmer specializing in turning complex datasets into
-              intuitive, high-performance applications and actionable insights.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button
-                onClick={() => document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' })}
-                className="px-8 py-3 font-bold rounded-md transition-all flex items-center gap-2 bg-primary text-primary-foreground hover:opacity-90"
-              >
-                View Projects <ChevronRight className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setIsCvOpen(true)}
-                className="px-8 py-3 font-bold rounded-md border transition-all flex items-center gap-2 border-primary text-primary hover:bg-primary/5"
-              >
-                View CV <FileText className="w-4 h-4" />
-              </button>
-              <div className="flex items-center gap-4">
-                {socialLinks.slice(0, 2).map((link) => (
-                  <a
-                    key={link.name}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-3 rounded-full bg-secondary text-muted-foreground hover:text-primary transition-colors"
-                    title={link.name}
+        <section id="home" ref={heroRef} className="relative overflow-hidden border-b border-border/60">
+          {/* Background: faint data grid + a restrained glow, not a decorative blob */}
+          <div className="absolute inset-0 z-0 bg-data-grid opacity-[0.45] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black_40%,transparent_100%)]" />
+          <div className="absolute -top-24 -left-24 z-0 w-[32rem] h-[32rem] rounded-full bg-primary/10 blur-[100px]" />
+
+          <div className="container relative z-10 pt-28 pb-20 lg:pt-36 lg:pb-28">
+            <div className="grid gap-14 lg:grid-cols-[1.3fr_1fr] lg:gap-16 xl:gap-24 items-center">
+              {/* Left: claim, identity, CTAs, evidence */}
+              <div className="text-center lg:text-left">
+                <h1
+                  className={`font-display text-4xl sm:text-5xl lg:text-[3.4rem] xl:text-6xl font-semibold tracking-tight leading-[1.1] max-w-2xl mx-auto lg:mx-0 ${revealCls}`}
+                  style={revealDelay(0)}
+                >
+                  I turn scattered records into <span className="text-primary">systems</span> your team can actually use.
+                </h1>
+
+                <p
+                  className={`font-label mt-5 text-xs sm:text-sm tracking-wide text-muted-foreground/80 ${revealCls}`}
+                  style={revealDelay(60)}
+                >
+                  Jeremiah Orpilla — Data Analyst &amp; Developer <span className="text-border">·</span> Cagayan Valley, PH
+                </p>
+
+                <div
+                  className={`mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-4 ${revealCls}`}
+                  style={revealDelay(120)}
+                >
+                  <button
+                    onClick={() => scrollToSection('contact')}
+                    className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/20 active:translate-y-0 transition-all duration-200 ${EASE}`}
                   >
-                    {link.name === 'GitHub' ? <Github className="w-5 h-5" /> : link.name === 'LinkedIn' ? <Linkedin className="w-5 h-5" /> : link.name === 'Facebook' ? <Facebook className="w-5 h-5" /> : link.name === 'Instagram' ? <Instagram className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
-                  </a>
-                ))}
+                    Get in touch <ChevronRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => scrollToSection('projects')}
+                    className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-border font-semibold text-sm hover:border-primary/50 hover:text-primary hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 ${EASE}`}
+                  >
+                    See the work
+                  </button>
+                  <div className="hidden sm:block w-px h-6 bg-border" />
+                  <div className="flex items-center gap-1">
+                    {socialLinks.slice(0, 2).map((link) => (
+                      <a
+                        key={link.name}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`p-2.5 rounded-md text-muted-foreground hover:text-primary hover:bg-secondary transition-colors duration-200 ${EASE}`}
+                        title={link.name}
+                      >
+                        {link.name === 'GitHub' ? <Github className="w-5 h-5" /> : link.name === 'LinkedIn' ? <Linkedin className="w-5 h-5" /> : link.name === 'Facebook' ? <Facebook className="w-5 h-5" /> : link.name === 'Instagram' ? <Instagram className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Proof log — framed explicitly as evidence for the headline claim */}
+                <div className={`mt-14 ${revealCls}`} style={revealDelay(200)}>
+                  <p className="font-label text-[11px] uppercase tracking-[0.16em] text-muted-foreground/70">
+                    What that looks like
+                  </p>
+                  <ul className="mt-3 border-t border-border/70 max-w-xl mx-auto lg:mx-0">
+                    {[
+                      { before: '102-page PDF', after: 'searchable knowledge base' },
+                      { before: 'Scattered yearly sheets', after: 'one processing system' },
+                      { before: '32,000 rows since 2002', after: 'one queryable model' },
+                    ].map((item, i) => (
+                      <li
+                        key={i}
+                        className={`group flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3 px-2 -mx-2 rounded-md border-b border-border/70 text-sm justify-center lg:justify-start transition-colors duration-200 ${EASE} hover:bg-secondary/50`}
+                      >
+                        <span className="font-label text-[11px] text-primary/60 tabular-nums">
+                          {String(i + 1).padStart(2, '0')}
+                        </span>
+                        <span className="text-muted-foreground">{item.before}</span>
+                        <ChevronRight className={`w-3.5 h-3.5 text-primary/50 shrink-0 transition-transform duration-200 ${EASE} group-hover:translate-x-0.5`} />
+                        <span className="font-medium text-foreground">{item.after}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Right: avatar, with Jek Cat tucked in the corner - in the margins, literally */}
+              <div
+                ref={heroVisualRef}
+                className={`flex justify-center lg:justify-end ${revealCls}`}
+                style={revealDelay(90)}
+              >
+                <div className="relative w-full max-w-xs">
+                  <div
+                    ref={avatarRef}
+                    className={`aspect-[4/5] rounded-2xl overflow-hidden border border-border/70 bg-secondary/30 shadow-[0_24px_48px_-28px_rgba(15,23,42,0.35)] transition-transform duration-300 ${EASE} will-change-transform`}
+                  >
+                    <img src="/avatar.png" alt="Jeremiah Orpilla" className="w-full h-full object-cover" />
+                  </div>
+
+                  {/* Jek Cat - tucked in the corner, discoverable on hover/proximity */}
+                  <div className="absolute -bottom-4 -right-4">
+                    {/* Speech Bubble */}
+                    <div
+                      className={`absolute bottom-full right-0 mb-3 w-56 p-3 rounded-xl shadow-xl transition-all duration-200 ${EASE} ${showCatFact ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'} bg-card border border-border`}
+                    >
+                      <p className="text-xs leading-relaxed font-medium text-center">
+                        {isWalking ? storySteps[storyIndex] : `"${randomFact}"`}
+                      </p>
+                      <div className="absolute top-full right-4 w-3 h-3 border-r border-b rotate-45 -mt-1.5 bg-card border-border" />
+                    </div>
+
+                    <button
+                      ref={catRef}
+                      onClick={isWalking ? undefined : startStory}
+                      onContextMenu={(e) => { e.preventDefault(); triggerCatFact(); }}
+                      onMouseEnter={() => !isWalking && setIsCatDancing(true)}
+                      onMouseLeave={() => !isWalking && setIsCatDancing(false)}
+                      className={`w-11 h-11 flex items-center justify-center rounded-full bg-background border border-border/70 shadow-sm transition-all duration-200 ${EASE} hover:opacity-100 hover:scale-100 ${
+                        isCatNear || isWalking || prefersReducedMotion ? 'opacity-100 scale-100' : 'opacity-40 scale-90'
+                      }`}
+                      title="Click for a story, right-click for a fact"
+                    >
+                      <span className="text-xl inline-block -scale-x-100">
+                        {isWalking ? '🐈' : (isCatDancing ? '😸' : '🐱')}
+                      </span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -595,63 +759,6 @@ export default function Home() {
           </div>
         </section>
       </main>
-
-      {/* Jek Cat Mascot */}
-      <div
-        className="fixed bottom-12 z-[100] transition-all duration-1000 ease-linear"
-        style={{
-          // Moved significantly further left to be more "center-right" (20% from the right edge)
-          right: isWalking ? `calc(20% + ${walkProgress}%)` : '20%',
-          transform: isWalking ? 'translateX(50%)' : 'none'
-        }}
-        onMouseEnter={() => !isWalking && setIsCatDancing(true)}
-        onMouseLeave={() => !isWalking && setIsCatDancing(false)}
-      >
-        {/* Speech Bubble */}
-        <div className={`absolute bottom-full mb-4 w-64 p-4 rounded-2xl shadow-2xl transition-all duration-500 ${showCatFact ? 'scale-100 opacity-100' : 'scale-0 opacity-0'} left-1/2 -translate-x-1/2 bg-card border border-border`}>
-          <p className="text-sm leading-relaxed font-medium text-center">
-            {isWalking ? storySteps[storyIndex] : `"${randomFact}"`}
-          </p>
-          {/* Arrow pointing to the cat - centered under the bubble */}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 w-4 h-4 border-r border-b rotate-45 -mt-2 bg-card border-border" />
-        </div>
-
-        {/* The Cat */}
-        <div className="relative group">
-          <button
-            onClick={isWalking ? undefined : startStory}
-            onContextMenu={(e) => { e.preventDefault(); triggerCatFact(); }}
-            className={`relative w-20 h-20 flex items-center justify-center transition-all duration-500 ${isCatDancing || isWalking ? 'scale-110' : 'scale-100 hover:scale-110'}`}
-            title={isWalking ? "I'm telling a story!" : "Click to hear my story, Right-click for a fact!"}
-          >
-            {/* The Cat - Note: isWalking uses normal scale, idle/dancing uses -scale-x-100 to face left (default) */}
-            <div className={`text-5xl transition-all duration-300 ${isCatDancing || isWalking ? 'animate-bounce' : ''} ${isWalking ? '' : '-scale-x-100'}`}>
-              {isWalking ? '🐈' : (isCatDancing ? '😸' : '🐱')}
-            </div>
-
-            {/* Interactive Glow */}
-            <div className={`absolute inset-0 bg-primary/20 blur-xl rounded-full transition-opacity duration-500 ${isWalking ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
-
-            {/* Sparkles */}
-            {(isCatDancing || isWalking) && (
-              <>
-                <div className="absolute -top-4 -left-4 animate-ping text-sm">✨</div>
-                <div className="absolute -top-2 -right-2 animate-pulse text-sm delay-75">✨</div>
-                <div className="absolute -bottom-2 -left-2 animate-pulse text-sm delay-150">✨</div>
-              </>
-            )}
-          </button>
-
-          {/* Instructions Hint */}
-          {!isWalking && (
-            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 bg-background/80 backdrop-blur-sm border border-border rounded text-[10px] font-bold uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-              Click to Start Story
-            </div>
-          )}
-        </div>
-      </div>
-
-
 
       {/* CV Modal - Custom Recreated Version */}
       {isCvOpen && (
