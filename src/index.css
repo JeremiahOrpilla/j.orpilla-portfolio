@@ -108,14 +108,27 @@
   .data-gradient {
     @apply bg-gradient-to-r from-blue-600 to-teal-500;
   }
+
+  /* Headline face: Inter, scoped so it overrides the global mono-heading
+     rule below without changing h1-h6 anywhere else on the page. */
+  .font-display {
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Explicit JetBrains Mono for "system label" text that isn't a heading
+     (identity line, proof-log index, cat tag) — mono as identity accent,
+     not as the display face. */
+  .font-label {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Faint data-grid texture, used behind the hero in place of a blurred
+     decorative blob. */
+  .bg-data-grid {
+    background-image:
+      linear-gradient(to right, var(--border) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
 }
 
-/* Custom animations */
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.6s ease-out forwards;
-}
