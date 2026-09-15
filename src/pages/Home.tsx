@@ -8,6 +8,7 @@ import {
   FileText, Download, Eye, ChevronLeft
 } from 'lucide-react';
 import { experience, funFacts, insights, projects, socialLinks, storySteps } from '@/content/portfolioContent';
+import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
 
 export default function Home() {
   const [activeSection, setActiveSection] = useState('home');
@@ -71,7 +72,6 @@ export default function Home() {
   const [currentFactIndex, setCurrentFactIndex] = useState(0);
   const [randomFact, setRandomFact] = useState(funFacts[0]);
   const [showCatFact, setShowCatFact] = useState(false);
-  const [isCatDancing, setIsCatDancing] = useState(false);
   const [isWalking, setIsWalking] = useState(false);
   const [storyIndex, setStoryIndex] = useState(-1);
 
@@ -123,16 +123,10 @@ export default function Home() {
     }
   };
 
-  // Hero reveal, cursor-follow avatar parallax, and the cat's proximity
-  // reaction. Kept deliberately restrained: one-shot, IntersectionObserver
-  // driven, direct DOM writes for the continuous pointer values (no
-  // re-render per mousemove), nothing that loops on its own.
+  // Hero reveal. Deliberately restrained: one-shot, IntersectionObserver
+  // driven, nothing that loops on its own.
   const heroRef = useRef<HTMLDivElement>(null);
-  const heroVisualRef = useRef<HTMLDivElement>(null);
-  const avatarRef = useRef<HTMLDivElement>(null);
-  const catRef = useRef<HTMLButtonElement>(null);
   const [heroInView, setHeroInView] = useState(false);
-  const [isCatNear, setIsCatNear] = useState(false);
   const [prefersReducedMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
@@ -153,56 +147,25 @@ export default function Home() {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (prefersReducedMotion) return;
-    const container = heroVisualRef.current;
-    if (!container) return;
-
-    let raf = 0;
-    let catIsNear = false;
-
-    const handlePointerMove = (e: PointerEvent) => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        const rect = container.getBoundingClientRect();
-        const relX = (e.clientX - rect.left) / rect.width - 0.5;
-        const relY = (e.clientY - rect.top) / rect.height - 0.5;
-
-        if (avatarRef.current) {
-          const maxShift = 10;
-          avatarRef.current.style.transform = `translate3d(${-relX * maxShift}px, ${-relY * maxShift}px, 0)`;
-        }
-
-        if (catRef.current) {
-          const catRect = catRef.current.getBoundingClientRect();
-          const dx = e.clientX - (catRect.left + catRect.width / 2);
-          const dy = e.clientY - (catRect.top + catRect.height / 2);
-          const near = Math.hypot(dx, dy) < 90;
-          if (near !== catIsNear) {
-            catIsNear = near;
-            setIsCatNear(near);
-          }
-        }
-      });
-    };
-
-    const handlePointerLeave = () => {
-      if (avatarRef.current) avatarRef.current.style.transform = 'translate3d(0, 0, 0)';
-      if (catIsNear) {
-        catIsNear = false;
-        setIsCatNear(false);
-      }
-    };
-
-    container.addEventListener('pointermove', handlePointerMove);
-    container.addEventListener('pointerleave', handlePointerLeave);
-    return () => {
-      container.removeEventListener('pointermove', handlePointerMove);
-      container.removeEventListener('pointerleave', handlePointerLeave);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [prefersReducedMotion]);
+  // Jek Cat, now a Rive animation. Its own state machine ("State Machine 1")
+  // has a built-in pointer listener over its hit area that drives head/eye
+  // tracking directly in the .riv graph — no custom pointermove code needed
+  // here, unlike the old parallax. Story/fact triggering has no equivalent
+  // in the file (it exposes no state machine inputs to fire from outside),
+  // so that stays plain React state on the wrapping button, same as before.
+  //
+  // The artboard bakes in a full-bleed cream background rectangle we can't
+  // remove at the source (couldn't be stripped in the Rive editor). Cat
+  // renders at its natural size (no crop/zoom) so whiskers, ears, and tail
+  // stay fully intact; the cream is hidden by a radial gradient overlay
+  // painted on top instead (see the JSX below) — transparent over the cat,
+  // fading to the hero's own background color at the corners.
+  const { RiveComponent } = useRive({
+    src: '/cat.riv',
+    stateMachine: 'State Machine 1',
+    autoplay: !prefersReducedMotion,
+    layout: new Layout({ fit: Fit.Cover, alignment: Alignment.Center }),
+  });
 
   const EASE = 'ease-[cubic-bezier(0.16,1,0.3,1)]';
   const revealCls = `transition-all duration-300 ${EASE} ${heroInView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`;
@@ -281,12 +244,19 @@ export default function Home() {
                   I turn scattered records into <span className="text-primary">systems</span> your team can actually use.
                 </h1>
 
-                <p
-                  className={`font-label mt-5 text-xs sm:text-sm tracking-wide text-muted-foreground/80 ${revealCls}`}
+                <div
+                  className={`mt-5 flex items-center justify-center lg:justify-start gap-2.5 ${revealCls}`}
                   style={revealDelay(60)}
                 >
-                  Jeremiah Orpilla — Data Analyst &amp; Developer <span className="text-border">·</span> Cagayan Valley, PH
-                </p>
+                  <img
+                    src="/avatar.png"
+                    alt="Jeremiah Orpilla"
+                    className="w-7 h-7 rounded-full object-cover border border-border/70 shrink-0"
+                  />
+                  <p className="font-label text-xs sm:text-sm tracking-wide text-muted-foreground/80">
+                    Jeremiah Orpilla — Data Analyst &amp; Developer <span className="text-border">·</span> Cagayan Valley, PH
+                  </p>
+                </div>
 
                 <div
                   className={`mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-4 ${revealCls}`}
@@ -321,75 +291,45 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Proof log — framed explicitly as evidence for the headline claim */}
-                <div className={`mt-14 ${revealCls}`} style={revealDelay(200)}>
-                  <p className="font-label text-[11px] uppercase tracking-[0.16em] text-muted-foreground/70">
-                    What that looks like
-                  </p>
-                  <ul className="mt-3 border-t border-border/70 max-w-xl mx-auto lg:mx-0">
-                    {[
-                      { before: '102-page PDF', after: 'searchable knowledge base' },
-                      { before: 'Scattered yearly sheets', after: 'one processing system' },
-                      { before: '32,000 rows since 2002', after: 'one queryable model' },
-                    ].map((item, i) => (
-                      <li
-                        key={i}
-                        className={`group flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3 px-2 -mx-2 rounded-md border-b border-border/70 text-sm justify-center lg:justify-start transition-colors duration-200 ${EASE} hover:bg-secondary/50`}
-                      >
-                        <span className="font-label text-[11px] text-primary/60 tabular-nums">
-                          {String(i + 1).padStart(2, '0')}
-                        </span>
-                        <span className="text-muted-foreground">{item.before}</span>
-                        <ChevronRight className={`w-3.5 h-3.5 text-primary/50 shrink-0 transition-transform duration-200 ${EASE} group-hover:translate-x-0.5`} />
-                        <span className="font-medium text-foreground">{item.after}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {/* Capability line — quiet, same treatment as the identity line */}
+                <p
+                  className={`mt-14 font-label text-xs sm:text-sm tracking-wide text-muted-foreground/80 ${revealCls}`}
+                  style={revealDelay(200)}
+                >
+                  Dashboards · Data models · Internal tools · Spreadsheet systems
+                </p>
               </div>
 
-              {/* Right: avatar, with Jek Cat tucked in the corner - in the margins, literally */}
+              {/* Right: Jek Cat, now a Rive animation that tracks the cursor */}
               <div
-                ref={heroVisualRef}
-                className={`flex justify-center lg:justify-end ${revealCls}`}
+                className={`min-w-0 flex justify-center lg:justify-end ${revealCls}`}
                 style={revealDelay(90)}
               >
-                <div className="relative w-full max-w-xs">
+                <div className="relative w-full max-w-md">
+                  {/* Speech Bubble */}
                   <div
-                    ref={avatarRef}
-                    className={`aspect-[4/5] rounded-2xl overflow-hidden border border-border/70 bg-secondary/30 shadow-[0_24px_48px_-28px_rgba(15,23,42,0.35)] transition-transform duration-300 ${EASE} will-change-transform`}
+                    className={`absolute bottom-full mb-3 left-1/2 -translate-x-1/2 w-56 p-3 rounded-xl shadow-xl transition-all duration-200 ${EASE} ${showCatFact ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'} bg-card border border-border z-10`}
                   >
-                    <img src="/avatar.png" alt="Jeremiah Orpilla" className="w-full h-full object-cover" />
+                    <p className="text-xs leading-relaxed font-medium text-center">
+                      {isWalking ? storySteps[storyIndex] : `"${randomFact}"`}
+                    </p>
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-3 h-3 border-r border-b rotate-45 -mt-1.5 bg-card border-border" />
                   </div>
 
-                  {/* Jek Cat - tucked in the corner, discoverable on hover/proximity */}
-                  <div className="absolute -bottom-4 -right-4">
-                    {/* Speech Bubble */}
+                  <button
+                    type="button"
+                    onClick={isWalking ? undefined : startStory}
+                    onContextMenu={(e) => { e.preventDefault(); triggerCatFact(); }}
+                    className="relative block w-full aspect-[4/5] rounded-2xl overflow-hidden border border-border/70 bg-secondary/30 shadow-[0_24px_48px_-28px_rgba(15,23,42,0.35)] cursor-pointer"
+                    title="Click for a story, right-click for a fact"
+                  >
+                    <RiveComponent className="w-full h-full" />
+                    {/* Cream-hider: transparent over the cat, fading to the hero's
+                        own background color at the corners, in place of a crop/mask */}
                     <div
-                      className={`absolute bottom-full right-0 mb-3 w-56 p-3 rounded-xl shadow-xl transition-all duration-200 ${EASE} ${showCatFact ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'} bg-card border border-border`}
-                    >
-                      <p className="text-xs leading-relaxed font-medium text-center">
-                        {isWalking ? storySteps[storyIndex] : `"${randomFact}"`}
-                      </p>
-                      <div className="absolute top-full right-4 w-3 h-3 border-r border-b rotate-45 -mt-1.5 bg-card border-border" />
-                    </div>
-
-                    <button
-                      ref={catRef}
-                      onClick={isWalking ? undefined : startStory}
-                      onContextMenu={(e) => { e.preventDefault(); triggerCatFact(); }}
-                      onMouseEnter={() => !isWalking && setIsCatDancing(true)}
-                      onMouseLeave={() => !isWalking && setIsCatDancing(false)}
-                      className={`w-11 h-11 flex items-center justify-center rounded-full bg-background border border-border/70 shadow-sm transition-all duration-200 ${EASE} hover:opacity-100 hover:scale-100 ${
-                        isCatNear || isWalking || prefersReducedMotion ? 'opacity-100 scale-100' : 'opacity-40 scale-90'
-                      }`}
-                      title="Click for a story, right-click for a fact"
-                    >
-                      <span className="text-xl inline-block -scale-x-100">
-                        {isWalking ? '🐈' : (isCatDancing ? '😸' : '🐱')}
-                      </span>
-                    </button>
-                  </div>
+                      className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_farthest-corner_at_50%_50%,transparent_40%,var(--background)_78%)]"
+                    />
+                  </button>
                 </div>
               </div>
             </div>
@@ -733,6 +673,36 @@ export default function Home() {
                   </div>
                   <div className="text-[10px] mt-1 text-muted-foreground/60">
                     © {new Date().getFullYear()} Jeremiah Orpilla. All rights reserved.
+                  </div>
+                  <div className="text-[10px] mt-1 text-muted-foreground/50">
+                    Cat animation by{' '}
+                    <a
+                      href="https://rive.app/@hooda.akshay11"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-muted-foreground"
+                    >
+                      hooda.akshay11
+                    </a>
+                    , remixed from{' '}
+                    <a
+                      href="https://rive.app/@pedroalpera"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-muted-foreground"
+                    >
+                      pedroalpera
+                    </a>
+                    , licensed{' '}
+                    <a
+                      href="https://creativecommons.org/licenses/by/4.0/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:text-muted-foreground"
+                    >
+                      CC BY 4.0
+                    </a>
+                    .
                   </div>
                 </div>
 
